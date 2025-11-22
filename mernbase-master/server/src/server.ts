@@ -3,6 +3,7 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import { connectDB } from './db/db';
+import authRoutes from './routes/authRoutes';
 
 // Load environment variables
 dotenv.config({ path: './.env' });
@@ -36,6 +37,9 @@ connectDB()
 app.get('/home', (req: Request, res: Response) => {
   res.send('Welcome to the AI Model API');
 });
+
+// Auth Routes
+app.use('/api/auth', authRoutes);
 
 // Example route for API
 app.post('/api/model', async (req: Request, res: Response) => {
