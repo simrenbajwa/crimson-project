@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Alert,
   Box,
@@ -23,8 +23,23 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
 type Mode = "login" | "signup";
 
+interface AuthUser {
+  id?: string;
+  _id?: string;
+  name?: string;
+  email: string;
+  [key: string]: any;
+}
+
+interface AuthResponse {
+  token?: string;
+  user?: AuthUser;
+  message?: string;
+  error?: string;
+}
+
 const API_BASE =
-  process.env.REACT_APP_API_URL?.trim() ||
+  (process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL.trim()) ||
   "http://localhost:5000";
 
 function useQuery() {
@@ -38,6 +53,7 @@ const AuthPage: React.FC = () => {
   const qs = useQuery();
 
   const initialMode = (qs.get("mode") === "signup" ? "signup" : "login") as Mode;
+
   const [mode, setMode] = useState<Mode>(initialMode);
 
   const [email, setEmail] = useState("");
@@ -50,6 +66,7 @@ const AuthPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Sync mode to query param
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     params.set("mode", mode);
@@ -63,25 +80,47 @@ const AuthPage: React.FC = () => {
       ? "Log in to continue."
       : "Sign up to get started.";
 
-  const validate = () => {
-    if (!email || !email.includes("@")) return "Please enter a valid email.";
-    if (mode === "signup" && name.trim().length < 2) return "Please enter your full name.";
-    if (password.length < 6) return "Password must be at least 6 characters.";
+  const validate = useCallback((): string | null => {
+    if (!email || !email.includes("@") || !email.includes(".")) {
+      return "Please enter a valid email address.";
+    }
+    if (mode === "signup" && name.trim().length < 2) {
+      return "Please enter your full name.";
+    }
+    if (password.length < 6) {
+      return "Password must be at least 6 characters.";
+    }
     return null;
+  }, [email, name, password, mode]);
+
+  const persistAuth = (data: AuthResponse) => {
+    if (data.token) {
+      if (remember) {
+        localStorage.setItem("token", data.token);
+      } else {
+        sessionStorage.setItem("token", data.token);
+      }
+    }
+    if (data.user) {
+      localStorage.setItem("user", JSON.stringify(data.user));
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitting) return;
+
     setError(null);
     setSuccessMsg(null);
 
-    const v = validate();
-    if (v) {
-      setError(v);
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setSubmitting(true);
+
     try {
       const url =
         mode === "login"
@@ -100,32 +139,52 @@ const AuthPage: React.FC = () => {
         body: JSON.stringify(payload),
       });
 
+      let data: AuthResponse | null = null;
+
+      try {
+        data = (await res.json()) as AuthResponse;
+      } catch {
+        // non-JSON or empty response
+      }
+
       if (!res.ok) {
-        let msg = "Request failed.";
-        try {
-          const data = await res.json();
-          msg = data?.message || data?.error || msg;
-        } catch {}
+        const msg =
+          data?.message ||
+          data?.error ||
+          `Request failed with status ${res.status}`;
         throw new Error(msg);
       }
 
-      const data = await res.json();
-
-      if (data?.token) {
-        if (remember) localStorage.setItem("token", data.token);
-        else sessionStorage.setItem("token", data.token);
-      }
-      if (data?.user) {
-        localStorage.setItem("user", JSON.stringify(data.user));
+      if (data) {
+        persistAuth(data);
       }
 
-      setSuccessMsg(mode === "login" ? "Logged in successfully." : "Account created successfully.");
+      setSuccessMsg(
+        mode === "login"
+          ? "Logged in successfully."
+          : "Account created successfully."
+      );
+
+      // Small delay so the user can see the success state
       setTimeout(() => navigate("/"), 600);
-    } catch (err: any) {
-      setError(err?.message ?? "Something went wrong. Try again.");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again.";
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleToggleMode = (nextMode: Mode) => {
+    if (nextMode === mode) return;
+    setMode(nextMode);
+    // Clean slate when switching between login/signup
+    setError(null);
+    setSuccessMsg(null);
+    setPassword("");
   };
 
   const FormCard = (
@@ -134,7 +193,6 @@ const AuthPage: React.FC = () => {
       sx={{
         width: "100%",
         maxWidth: 750,
-        alignContent:"center",
         mx: "auto",
         p: { xs: 3, sm: 4 },
         borderRadius: 3,
@@ -144,14 +202,19 @@ const AuthPage: React.FC = () => {
       component="form"
       onSubmit={handleSubmit}
       noValidate
-    
     >
       <Stack spacing={2.5}>
         <Stack direction="row" alignItems="center" spacing={1}>
-          <IconButton onClick={() => navigate("/")} size="small" aria-label="Back to home">
+          <IconButton
+            onClick={() => navigate("/")}
+            size="small"
+            aria-label="Back to home"
+          >
             <ArrowBackIosNewIcon fontSize="small" />
           </IconButton>
-          <Typography variant="overline" color="text.secondary">Back</Typography>
+          <Typography variant="overline" color="text.secondary">
+            Back
+          </Typography>
         </Stack>
 
         <Typography variant="h4" fontWeight={800}>
@@ -171,6 +234,8 @@ const AuthPage: React.FC = () => {
             onChange={(e) => setName(e.target.value)}
             autoComplete="name"
             required
+            fullWidth
+            disabled={submitting}
           />
         )}
 
@@ -181,6 +246,8 @@ const AuthPage: React.FC = () => {
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
           required
+          fullWidth
+          disabled={submitting}
         />
 
         <TextField
@@ -190,6 +257,8 @@ const AuthPage: React.FC = () => {
           onChange={(e) => setPassword(e.target.value)}
           autoComplete={mode === "login" ? "current-password" : "new-password"}
           required
+          fullWidth
+          disabled={submitting}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
@@ -206,33 +275,60 @@ const AuthPage: React.FC = () => {
         />
 
         {mode === "login" && (
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+          >
             <FormControlLabel
-              control={<Checkbox checked={remember} onChange={(e) => setRemember(e.target.checked)} />}
+              control={
+                <Checkbox
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  disabled={submitting}
+                />
+              }
               label="Remember me"
             />
-            <Link component="button" underline="hover" onClick={() => alert("Hook up your reset flow.")}>
+            <Link
+              component="button"
+              underline="hover"
+              onClick={() => alert("Hook up your reset flow.")}
+              disabled={submitting}
+            >
               Forgot password?
             </Link>
           </Stack>
         )}
 
-        <Button type="submit" variant="contained" size="large" disabled={submitting}>
-          {submitting ? (mode === "login" ? "Logging in..." : "Creating account...") : (mode === "login" ? "Log in" : "Sign up")}
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          disabled={submitting}
+          fullWidth
+        >
+          {submitting
+            ? mode === "login"
+              ? "Logging in..."
+              : "Creating account..."
+            : mode === "login"
+            ? "Log in"
+            : "Sign up"}
         </Button>
 
         <Typography textAlign="center" color="text.secondary">
           {mode === "login" ? (
             <>
               Don&apos;t have an account?{" "}
-              <Link component="button" onClick={() => setMode("signup")}>
+              <Link component="button" onClick={() => handleToggleMode("signup")}>
                 Sign up
               </Link>
             </>
           ) : (
             <>
               Already have an account?{" "}
-              <Link component="button" onClick={() => setMode("login")}>
+              <Link component="button" onClick={() => handleToggleMode("login")}>
                 Log in
               </Link>
             </>
@@ -243,19 +339,21 @@ const AuthPage: React.FC = () => {
   );
 
   return (
-    // Give the page enough vertical space so the footer sits at the end,
-    // while the auth section feels centered (no “footer immediately under cards”).
-    <Box sx={{ minHeight: { xs: "auto", md: "100svh" }, display: "grid", alignContent: "center" }}>
+    <Box
+      sx={{
+        minHeight: { xs: "auto", md: "100svh" },
+        display: "grid",
+        alignContent: "center",
+      }}
+    >
       <Container sx={{ py: { xs: 4, md: 8 } }}>
         <Grid
           container
           spacing={3}
           alignItems="center"
           justifyContent="center"
-          // keep layout narrower on huge screens so it doesn't look sparse
           sx={{ maxWidth: 1200, mx: "auto" }}
         >
-          {/* Form */}
           <Grid item xs={12} sm={8} md={6} lg={5} display="flex">
             <Box sx={{ width: "100%", display: "grid", alignContent: "center" }}>
               {FormCard}
