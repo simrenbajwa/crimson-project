@@ -1,3 +1,4 @@
+// src/pages/AuthPage.tsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Alert,
@@ -21,26 +22,24 @@ import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 
+import api from "../services/api";
+
 type Mode = "login" | "signup";
 
 interface AuthUser {
   id?: string;
   _id?: string;
-  name?: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   [key: string]: any;
 }
 
 interface AuthResponse {
-  token?: string;
-  user?: AuthUser;
   message?: string;
   error?: string;
+  user?: AuthUser;
 }
-
-const API_BASE =
-  (process.env.REACT_APP_API_URL && process.env.REACT_APP_API_URL.trim()) ||
-  "http://localhost:5000";
 
 function useQuery() {
   const { search } = useLocation();
@@ -53,11 +52,11 @@ const AuthPage: React.FC = () => {
   const qs = useQuery();
 
   const initialMode = (qs.get("mode") === "signup" ? "signup" : "login") as Mode;
-
   const [mode, setMode] = useState<Mode>(initialMode);
 
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [name, setName] = useState(""); // signup only
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [remember, setRemember] = useState(true);
@@ -66,7 +65,7 @@ const AuthPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Sync mode to query param
+  // keep mode in URL (?mode=login/signup)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     params.set("mode", mode);
@@ -84,26 +83,19 @@ const AuthPage: React.FC = () => {
     if (!email || !email.includes("@") || !email.includes(".")) {
       return "Please enter a valid email address.";
     }
-    if (mode === "signup" && name.trim().length < 2) {
-      return "Please enter your full name.";
+    if (mode === "signup") {
+      if (!firstName.trim()) return "Please enter your first name.";
+      if (!lastName.trim()) return "Please enter your last name.";
     }
     if (password.length < 6) {
       return "Password must be at least 6 characters.";
     }
     return null;
-  }, [email, name, password, mode]);
+  }, [email, password, firstName, lastName, mode]);
 
-  const persistAuth = (data: AuthResponse) => {
-    if (data.token) {
-      if (remember) {
-        localStorage.setItem("token", data.token);
-      } else {
-        sessionStorage.setItem("token", data.token);
-      }
-    }
-    if (data.user) {
-      localStorage.setItem("user", JSON.stringify(data.user));
-    }
+  const persistUser = (user?: AuthUser) => {
+    if (!user) return;
+    localStorage.setItem("user", JSON.stringify(user));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -122,56 +114,31 @@ const AuthPage: React.FC = () => {
     setSubmitting(true);
 
     try {
-      const url =
-        mode === "login"
-          ? `${API_BASE}/api/auth/login`
-          : `${API_BASE}/api/auth/signup`;
+      if (mode === "signup") {
+        const payload = { firstName, lastName, email, password };
+        const res = await api.post<AuthResponse>("/api/auth/signup", payload);
+        persistUser(res.data.user);
+        setSuccessMsg(res.data.message || "Account created successfully.");
+      } else {
+        const payload = { email, password };
+        const res = await api.post<AuthResponse>("/api/auth/login", payload);
+        persistUser(res.data.user);
 
-      const payload =
-        mode === "login"
-          ? { email, password, remember }
-          : { name, email, password };
+        // “Remember me” can be used for token later; for now we just keep user
+        if (!remember) {
+          // if you later add tokens, you can put them in sessionStorage here
+        }
 
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      let data: AuthResponse | null = null;
-
-      try {
-        data = (await res.json()) as AuthResponse;
-      } catch {
-        // non-JSON or empty response
+        setSuccessMsg(res.data.message || "Logged in successfully.");
       }
 
-      if (!res.ok) {
-        const msg =
-          data?.message ||
-          data?.error ||
-          `Request failed with status ${res.status}`;
-        throw new Error(msg);
-      }
-
-      if (data) {
-        persistAuth(data);
-      }
-
-      setSuccessMsg(
-        mode === "login"
-          ? "Logged in successfully."
-          : "Account created successfully."
-      );
-
-      // Small delay so the user can see the success state
       setTimeout(() => navigate("/"), 600);
-    } catch (err: unknown) {
+    } catch (err: any) {
       const msg =
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again.";
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Something went wrong. Please try again.";
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -181,7 +148,6 @@ const AuthPage: React.FC = () => {
   const handleToggleMode = (nextMode: Mode) => {
     if (nextMode === mode) return;
     setMode(nextMode);
-    // Clean slate when switching between login/signup
     setError(null);
     setSuccessMsg(null);
     setPassword("");
@@ -228,15 +194,26 @@ const AuthPage: React.FC = () => {
         {successMsg && <Alert severity="success">{successMsg}</Alert>}
 
         {mode === "signup" && (
-          <TextField
-            label="Full name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoComplete="name"
-            required
-            fullWidth
-            disabled={submitting}
-          />
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <TextField
+              label="First name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              autoComplete="given-name"
+              required
+              fullWidth
+              disabled={submitting}
+            />
+            <TextField
+              label="Last name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              autoComplete="family-name"
+              required
+              fullWidth
+              disabled={submitting}
+            />
+          </Stack>
         )}
 
         <TextField
@@ -355,7 +332,9 @@ const AuthPage: React.FC = () => {
           sx={{ maxWidth: 1200, mx: "auto" }}
         >
           <Grid item xs={12} sm={8} md={6} lg={5} display="flex">
-            <Box sx={{ width: "100%", display: "grid", alignContent: "center" }}>
+            <Box
+              sx={{ width: "100%", display: "grid", alignContent: "center" }}
+            >
               {FormCard}
             </Box>
           </Grid>
