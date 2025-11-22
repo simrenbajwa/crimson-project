@@ -9,8 +9,16 @@ dotenv.config({ path: './.env' });
 
 const app = express();
 
-app.use(cors());
-app.use(bodyParser.json());
+const corsOptions: CorsOptions = {
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  credentials: true, // allow cookies / auth headers
+};
+
+app.use(cors(corsOptions));
+// Optional but nice: handle preflight explicitly
+app.options('*', cors(corsOptions));
+
+app.use(express.json()); // you can drop bodyParser.json() if you use this
 
 connectDB()
   .then(() => {

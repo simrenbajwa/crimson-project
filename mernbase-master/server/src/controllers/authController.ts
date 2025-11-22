@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import User from '../models/User';
+import User from '../models/user';
 
 // ---------- Inline validation (no separate middleware) ----------
 const signupSchema = z.object({
