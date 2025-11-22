@@ -21,27 +21,12 @@ connectDB()
     process.exit(1);
   });
 
-// ---------------------
-// Mount your routes here
-// ---------------------
-app.use('/auth', authRoutes);  // <-- AND THIS
-
 // Test route
 app.get('/home', (req: Request, res: Response) => {
   res.send('Welcome to the AI Model API');
 });
 
-// Example route
-app.post('/api/model', async (req: Request, res: Response) => {
-  try {
-    const inputData = req.body;
-    const modelOutput = `Processed data: ${JSON.stringify(inputData)}`;
-    res.json({ output: modelOutput });
-  } catch (error) {
-    console.error('Error processing request:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
+app.use('/api/auth', authRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
