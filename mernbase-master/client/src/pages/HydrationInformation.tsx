@@ -32,22 +32,62 @@ const HydrationChart: React.FC<HydrationChartProps> = ({
   const theme = useTheme();
   const PlotlyComponent: any = Plot;
 
-  // Simple mock data using the recommended daily liters
   let x: string[] = [];
-  let y: number[] = [];
+  let data: any[] = [];
 
   if (variant === "planner") {
-    // Distribute recommended intake across the day
+    // Distribute recommended intake across the day (cumulative)
     x = ["8 AM", "10 AM", "12 PM", "2 PM", "4 PM", "6 PM", "8 PM"];
     const perInterval = recommendedLiters / x.length;
-    y = x.map((_, idx) => Number((perInterval * (idx + 1)).toFixed(2))); // cumulative
+    const cumulative = x.map((_, idx) =>
+      Number((perInterval * (idx + 1)).toFixed(2))
+    );
+
+    data = [
+      {
+        x,
+        y: cumulative,
+        type: "scatter",
+        mode: "lines+markers",
+        name: "Cumulative intake",
+        marker: { color: theme.palette.primary.main },
+        line: { width: 3, color: theme.palette.primary.main },
+        fill: "tozeroy",
+        fillcolor:
+          theme.palette.mode === "dark"
+            ? "rgba(59,130,246,0.15)"
+            : "rgba(37,99,235,0.15)",
+      },
+    ];
   } else {
-    // "Last 7 days" style sample
+    // Weekly: bars for actual vs target line
     x = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
     const base = recommendedLiters;
-    y = x.map((_, idx) =>
-      Number((base + (idx - 3) * 0.1).toFixed(2)) // small variation around base
+    const actual = x.map((_, idx) =>
+      Number((base + (idx - 3) * 0.1).toFixed(2))
     );
+
+    data = [
+      {
+        x,
+        y: actual,
+        type: "bar",
+        name: "Actual (L)",
+        marker: { color: theme.palette.primary.main },
+      },
+      {
+        x,
+        y: Array(x.length).fill(recommendedLiters),
+        type: "scatter",
+        mode: "lines",
+        name: `Target (${recommendedLiters} L)`,
+        line: {
+          width: 2,
+          dash: "dash",
+          color: theme.palette.secondary.main,
+        },
+      },
+    ];
   }
 
   return (
@@ -75,16 +115,7 @@ const HydrationChart: React.FC<HydrationChartProps> = ({
       />
       <CardContent sx={{ flexGrow: 1 }}>
         <PlotlyComponent
-          data={[
-            {
-              x,
-              y,
-              type: "scatter",
-              mode: "lines+markers",
-              marker: { color: theme.palette.primary.main },
-              line: { width: 3, color: theme.palette.primary.main },
-            },
-          ]}
+          data={data}
           layout={{
             autosize: true,
             height: 280,
@@ -106,6 +137,7 @@ const HydrationChart: React.FC<HydrationChartProps> = ({
               zeroline: false,
               title: "Liters",
             },
+            barmode: "group",
           }}
           style={{ width: "100%", height: "100%" }}
           config={{
@@ -124,10 +156,9 @@ const HydrationInformation: React.FC = () => {
   const [gender, setGender] = React.useState<Gender>("female");
   const [weight, setWeight] = React.useState<number>(60); // kg
 
-  // Super simple guideline-style calc (not medical advice):
-  // different base ml/kg per gender
+  // heuristic (not medical advice)
   const mlPerKg =
-    gender === "male" ? 40 : gender === "female" ? 35 : 33; // just a heuristic
+    gender === "male" ? 40 : gender === "female" ? 35 : 33;
   const recommendedLiters = Number(((weight * mlPerKg) / 1000).toFixed(2));
 
   const handleWeightChange = (
@@ -135,8 +166,7 @@ const HydrationInformation: React.FC = () => {
   ) => {
     const val = Number(e.target.value);
     if (isNaN(val)) return;
-    if (val < 20) return; // guard unrealistic values
-    if (val > 200) return;
+    if (val < 20 || val > 200) return;
     setWeight(val);
   };
 
@@ -180,8 +210,8 @@ const HydrationInformation: React.FC = () => {
               }}
             >
               Adjust your gender and weight to see how your recommended daily
-              water intake changes, and how that can be distributed across the
-              day or over the week.
+              water intake changes, then explore how it can be spaced across
+              the day and over the week.
             </Typography>
           </Box>
 
@@ -217,7 +247,7 @@ const HydrationInformation: React.FC = () => {
               </Button>
             </Stack>
 
-            {/* Weight + recommendation */}
+            {/* Weight + recommendation chip */}
             <Stack
               direction={{ xs: "column", sm: "row" }}
               spacing={2}
@@ -264,8 +294,8 @@ const HydrationInformation: React.FC = () => {
           </Grid>
           <Grid item xs={12} md={6}>
             <HydrationChart
-              title="Last 7 Days (Example)"
-              subtitle="How a consistent week might look"
+              title="Weekly Intake vs Target"
+              subtitle="Example week relative to your target"
               recommendedLiters={recommendedLiters}
               variant="weekly"
             />

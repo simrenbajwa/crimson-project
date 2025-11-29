@@ -7,6 +7,7 @@ import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import HydrationInformation from './pages/HydrationInformation';
 import SleepInformation from './pages/SleepInformation';
+import Profile from './pages/Profile';
 import Header from './components/Header';
 import Footer from './components/Footer';
 const App: React.FC = () => {
@@ -29,6 +30,7 @@ const App: React.FC = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/hydration" element={<HydrationInformation/>} />
             <Route path="/sleep" element={<SleepInformation />} />
+            <Route path="/profile" element={<Profile />} />
           </Routes>
         </Box>
         <Footer /> {/* Will only show at the end after content */}
