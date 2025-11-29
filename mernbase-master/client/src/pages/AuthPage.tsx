@@ -1,26 +1,28 @@
-// src/pages/AuthPage.tsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Alert,
+  AppBar,
   Box,
   Button,
   Checkbox,
   Container,
   FormControlLabel,
+  Grid,
   IconButton,
   InputAdornment,
   Link,
   Paper,
   Stack,
   TextField,
+  Toolbar,
   Typography,
-  Grid,
   useTheme,
 } from "@mui/material";
-import { useLocation, useNavigate } from "react-router-dom";
+import MenuIcon from "@mui/icons-material/Menu";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import api from "../services/api";
 
@@ -54,8 +56,7 @@ const AuthPage: React.FC = () => {
   const initialMode = (qs.get("mode") === "signup" ? "signup" : "login") as Mode;
   const [mode, setMode] = useState<Mode>(initialMode);
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -65,7 +66,7 @@ const AuthPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // keep mode in URL (?mode=login/signup)
+  // keep ?mode in URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     params.set("mode", mode);
@@ -73,7 +74,8 @@ const AuthPage: React.FC = () => {
     window.history.replaceState({}, "", url);
   }, [mode]);
 
-  const title = mode === "login" ? "Welcome back" : "Create your account";
+  const title =
+    mode === "login" ? "Welcome back" : "Create your account";
   const subtitle =
     mode === "login"
       ? "Log in to continue."
@@ -83,19 +85,25 @@ const AuthPage: React.FC = () => {
     if (!email || !email.includes("@") || !email.includes(".")) {
       return "Please enter a valid email address.";
     }
-    if (mode === "signup") {
-      if (!firstName.trim()) return "Please enter your first name.";
-      if (!lastName.trim()) return "Please enter your last name.";
+    if (mode === "signup" && !fullName.trim()) {
+      return "Please enter your full name.";
     }
     if (password.length < 6) {
       return "Password must be at least 6 characters.";
     }
     return null;
-  }, [email, password, firstName, lastName, mode]);
+  }, [email, fullName, password, mode]);
 
   const persistUser = (user?: AuthUser) => {
     if (!user) return;
     localStorage.setItem("user", JSON.stringify(user));
+  };
+
+  const splitFullName = (name: string) => {
+    const parts = name.trim().split(/\s+/);
+    const firstName = parts[0] || "";
+    const lastName = parts.slice(1).join(" ") || firstName;
+    return { firstName, lastName };
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -115,6 +123,7 @@ const AuthPage: React.FC = () => {
 
     try {
       if (mode === "signup") {
+        const { firstName, lastName } = splitFullName(fullName);
         const payload = { firstName, lastName, email, password };
         const res = await api.post<AuthResponse>("/api/auth/signup", payload);
         persistUser(res.data.user);
@@ -124,9 +133,8 @@ const AuthPage: React.FC = () => {
         const res = await api.post<AuthResponse>("/api/auth/login", payload);
         persistUser(res.data.user);
 
-        // “Remember me” can be used for token later; for now we just keep user
         if (!remember) {
-          // if you later add tokens, you can put them in sessionStorage here
+          // if you later add tokens, you might store them in sessionStorage here
         }
 
         setSuccessMsg(res.data.message || "Logged in successfully.");
@@ -158,18 +166,19 @@ const AuthPage: React.FC = () => {
       elevation={3}
       sx={{
         width: "100%",
-        maxWidth: 750,
+        maxWidth: 480,
         mx: "auto",
         p: { xs: 3, sm: 4 },
         borderRadius: 3,
         border: `1px solid ${theme.palette.divider}`,
-        backdropFilter: "blur(6px)",
+        bgcolor: "background.paper",
       }}
       component="form"
       onSubmit={handleSubmit}
       noValidate
     >
       <Stack spacing={2.5}>
+        {/* Back line */}
         <Stack direction="row" alignItems="center" spacing={1}>
           <IconButton
             onClick={() => navigate("/")}
@@ -183,6 +192,7 @@ const AuthPage: React.FC = () => {
           </Typography>
         </Stack>
 
+        {/* Titles */}
         <Typography variant="h4" fontWeight={800}>
           {title}
         </Typography>
@@ -194,26 +204,15 @@ const AuthPage: React.FC = () => {
         {successMsg && <Alert severity="success">{successMsg}</Alert>}
 
         {mode === "signup" && (
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-            <TextField
-              label="First name"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              autoComplete="given-name"
-              required
-              fullWidth
-              disabled={submitting}
-            />
-            <TextField
-              label="Last name"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              autoComplete="family-name"
-              required
-              fullWidth
-              disabled={submitting}
-            />
-          </Stack>
+          <TextField
+            label="Full name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            autoComplete="name"
+            required
+            fullWidth
+            disabled={submitting}
+          />
         )}
 
         <TextField
@@ -288,7 +287,7 @@ const AuthPage: React.FC = () => {
           {submitting
             ? mode === "login"
               ? "Logging in..."
-              : "Creating account..."
+              : "Signing up..."
             : mode === "login"
             ? "Log in"
             : "Sign up"}
@@ -318,28 +317,44 @@ const AuthPage: React.FC = () => {
   return (
     <Box
       sx={{
-        minHeight: { xs: "auto", md: "100svh" },
-        display: "grid",
-        alignContent: "center",
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        bgcolor: theme.palette.background.default,
       }}
     >
-      <Container sx={{ py: { xs: 4, md: 8 } }}>
-        <Grid
-          container
-          spacing={3}
-          alignItems="center"
-          justifyContent="center"
-          sx={{ maxWidth: 1200, mx: "auto" }}
-        >
-          <Grid item xs={12} sm={8} md={6} lg={5} display="flex">
-            <Box
-              sx={{ width: "100%", display: "grid", alignContent: "center" }}
-            >
+      {/* Top nav (Hydrow-style) */}
+      <AppBar position="static" elevation={0} sx={{ bgcolor: "#001a72" }}>
+        <Toolbar sx={{ justifyContent: "space-between" }}>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            Hydrow
+          </Typography>
+          <IconButton edge="end" color="inherit" aria-label="menu">
+            <MenuIcon />
+          </IconButton>
+        </Toolbar>
+      </AppBar>
+
+      {/* Main content */}
+      <Box
+        sx={{
+          flexGrow: 1,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "center",
+          py: { xs: 4, md: 6 },
+          px: 2,
+          bgcolor: "#f5f5f7",
+        }}
+      >
+        <Container maxWidth="sm">
+          <Grid container justifyContent="center">
+            <Grid item xs={12}>
               {FormCard}
-            </Box>
+            </Grid>
           </Grid>
-        </Grid>
-      </Container>
+        </Container>
+      </Box>
     </Box>
   );
 };
