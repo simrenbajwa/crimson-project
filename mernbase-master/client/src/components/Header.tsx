@@ -102,8 +102,8 @@ const Header: React.FC = () => {
 
             {/* Desktop nav */}
             <Box sx={{ display: { xs: "none", md: "flex" }, alignItems: "center", gap: 0.5 }}>
-              <NavButton to="/hydrationInformation" label="Hydration Information" active={isActive("/hydrationInformation")} />
-              <NavButton to="/#features" label="Features" active={isActive("/#features")} />
+              <NavButton to="/hydration" label="Hydration Information" active={isActive("/hydration")} />
+              <NavButton to="/sleep" label="Sleep Information" active={isActive("/sleep")} />
               <NavButton to="/dashboard" label="Dashboard" active={isActive("/dashboard")} />
               <Divider orientation="vertical" flexItem sx={{ mx: 1.5, opacity: 0.2 }} />
               <Button
@@ -147,15 +147,14 @@ const Header: React.FC = () => {
           </Box>
           <Divider sx={{ mb: 1 }} />
           <List>
-            <ListItemButton component={RouterLink} to="/hydrationInformation" onClick={() => setOpen(false)}>
+            <ListItemButton component={RouterLink} to="/hydration" onClick={() => setOpen(false)}>
               <ListItemText primary="Hydration Information" />
             </ListItemButton>
-            <ListItemButton component={RouterLink} to="/#features" onClick={() => setOpen(false)}>
-              <ListItemText primary="Features" />
+            <ListItemButton component={RouterLink} to="/sleep" onClick={() => setOpen(false)}>
+              <ListItemText primary="Sleep Information" />
             </ListItemButton>
             <ListItemButton component={RouterLink} to="/dashboard" onClick={() => setOpen(false)}>
               <ListItemText primary="Dashboard" />
-
             </ListItemButton>
           </List>
           <Divider sx={{ my: 1 }} />

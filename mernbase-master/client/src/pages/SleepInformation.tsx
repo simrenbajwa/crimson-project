@@ -8,23 +8,63 @@ import {
   Card,
   Stack,
 } from "@mui/material";
+import Plot from "react-plotly.js";
+import { CardHeader, CardContent, useTheme } from "@mui/material";
 
-const SampleLineGraph = () => (
-  <svg width="100%" height="100%" viewBox="0 0 300 120">
-    <polyline
-      fill="none"
-      stroke="#2e5cf5"
-      strokeWidth="4"
-      points="10,90 60,70 110,80 160,40 210,60 260,20"
-    />
-  </svg>
-);
+const SampleLineGraph: React.FC = () => {
+  const theme = useTheme();
+  // Workaround for incompatible React types between react-plotly.js and project @types/react:
+  // treat the Plot component as any when used in JSX.
+  const PlotlyComponent: any = Plot;
+
+  return (
+    <Card sx={{ width: "100%", maxWidth: 700, mx: "auto" }}>
+      <CardHeader title="Monthly Values (Plotly)" />
+
+      <CardContent>
+        <PlotlyComponent
+          data={[
+            {
+              x: ["Jan", "Feb", "Mar", "Apr", "May"],
+              y: [400, 300, 600, 200, 500],
+              type: "scatter",
+              mode: "lines+markers",
+              marker: { color: theme.palette.primary.main },
+              line: { width: 3, color: theme.palette.primary.main },
+            },
+          ]}
+          layout={{
+            autosize: true,
+            height: 350,
+            margin: { t: 40, l: 40, r: 20, b: 40 },
+            paper_bgcolor: "transparent",
+            plot_bgcolor: theme.palette.background.default,
+            font: {
+              color: theme.palette.text.primary,
+            },
+            xaxis: {
+              gridcolor: theme.palette.divider,
+            },
+            yaxis: {
+              gridcolor: theme.palette.divider,
+            },
+          }}
+          style={{ width: "100%", height: "100%" }}
+          config={{
+            displayModeBar: false, // clean MUI look
+            responsive: true,
+          }}
+        />
+      </CardContent>
+    </Card>
+  );
+};
 
 
 
 const SleepInformation: React.FC = () => {
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#f4f4f4" }}>
+    <Box sx={{ minHeight: "200vh", bgcolor: "#f4f4f4" }}>
 
       <Container sx={{ mt: 8 }}>
         <Box sx={{ mb: 3 }}>
@@ -46,7 +86,7 @@ const SleepInformation: React.FC = () => {
                 {/* Top graph (line chart) */}
                 <Card
                   sx={{
-                    height: 250,
+                    height: 500,
                     bgcolor: "#ffffff",
                     p: 2,
                     display: "flex",
@@ -55,19 +95,6 @@ const SleepInformation: React.FC = () => {
                   }}
                 >
                   <SampleLineGraph />
-                </Card>
-
-                {/* Bottom graph (bar chart) */}
-                <Card
-                  sx={{
-                    height: 120,
-                    bgcolor: "#ffffff",
-                    p: 2,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
                 </Card>
               </Stack>
             </Grid>
